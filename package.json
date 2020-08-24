@@ -8,6 +8,9 @@
         "build": "tsc"
     },
     "types": "index.d.ts",
+    "repository": {
+        "url": "https://github.com/tonmanna/sanitizeSQL"
+    },
     "author": "Tonmanna",
     "license": "ISC",
     "devDependencies": {
