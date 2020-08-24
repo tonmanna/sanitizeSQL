@@ -3,12 +3,7 @@
     "eslint.enable": true,
     "files.exclude": {
         "**/.git": true,
-        "**/.DS_Store": true,
         "**/node_modules": true,
-        "**/logs": true,
-        "package-lock.json": true,
-        "apify_storage": true,
-        ".gitignore": true
     },
     "editor.codeActionsOnSave": {
         "source.fixAll.eslint": true
