@@ -31,7 +31,7 @@ const not_allow_text = [
 export const sanitizeSQL = (SQL: string): string => {
     not_allow_text.forEach((value) => {
         const reg = new RegExp(value, 'gi');
-        SQL = SQL.replace(reg, '');
+        SQL = SQL.replace(reg, '').replace(/\s+/g, ' ');
     });
     return SQL;
 };
