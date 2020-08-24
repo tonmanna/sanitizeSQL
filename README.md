@@ -7,7 +7,7 @@ Just need to purify SQL Query befor send it to execution method.
 
 ```Type Script
  import { sanitizeSQL } from 'pg-sanitize'
- const SQL = 'SELECE * from username; DROP TABLE username'
+ let SQL = 'SELECE * from username; DROP TABLE username'
  SQL = sanitizeSQL(SQL);
  // This helper is not remove DROP TABLE but Query will be exception beacuse syntax is not correct.
 ```
