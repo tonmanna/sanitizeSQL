@@ -1,6 +1,6 @@
 {
     "name": "pg-sanitize",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "PG SQL Injection prevention with sanitize techniq",
     "main": "index.js",
     "scripts": {
