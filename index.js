@@ -52,8 +52,19 @@ exports.not_allow_text = [
     /\$\$/,                         // PostgreSQL dollar quoting
     /@[\w]+/,                       // Variables
 
-    // Stacked queries indicators
-    /;[\s]*drop/i,
+    // DDL statements - prevent schema modifications
+    /drop[\s]+table/i,
+    /drop[\s]+database/i,
+    /drop[\s]+schema/i,
+    /drop[\s]+index/i,
+    /drop[\s]+view/i,
+    /create[\s]+table/i,
+    /create[\s]+database/i,
+    /create[\s]+schema/i,
+    /create[\s]+index/i,
+    /create[\s]+view/i,
+    /alter[\s]+table/i,
+    /truncate[\s]+table/i,
 
     // Time-based blind injection
     /sleep[\s]*\(/i,
