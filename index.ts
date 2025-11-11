@@ -1,56 +1,187 @@
 export const not_allow_text = [
-    /--/,
-    /;/,
-    /\\*\\*/,
-    /current_user/,
-    /session_user/,
-    /pg_user/,
-    /getpgusername/,
-    /usesuper/,
-    /usecreatedb/,
-    /usecatupd/,
-    /current_database/,
-    /pg_database/,
-    /selectselect/, //after remove white space it will be select select
-    /information_schema/,
-    /table_name/,
-    /query_to_xml/,
-    /database_to_xml/,
-    /database_to_xmlschema/,
-    /postgresql/,
-    /randnum/,
-    /sleeptime/,
-    /pg_ls_dir/,
-    /pg_read_file/,
-    /pg_sleep/,
+    // Comments (block all comment styles)
+    /--/,                           // SQL line comments
+    /\/\*[\s\S]*?\*\//,            // Multi-line comments /* */
+    /\/\*/,                         // Unclosed multi-line comment start
+    /\*\//,                         // Comment end
+    /#/,                            // MySQL comment style
+
+    // Statement separators
+    /;/,                            // Multiple statements
+
+    // Dangerous PostgreSQL functions
+    /current_user/i,
+    /session_user/i,
+    /pg_user/i,
+    /getpgusername/i,
+    /usesuper/i,
+    /usecreatedb/i,
+    /usecatupd/i,
+    /current_database/i,
+    /pg_database/i,
+    /information_schema/i,
+    /table_name/i,
+    /query_to_xml/i,
+    /database_to_xml/i,
+    /database_to_xmlschema/i,
+    /pg_ls_dir/i,
+    /pg_read_file/i,
+    /pg_sleep/i,
+    /pg_stat_file/i,
+    /pg_read_binary_file/i,
+    /lo_import/i,
+    /lo_export/i,
+
+    // Common SQL injection patterns
+    /exec[\s]*\(/i,                 // Command execution
+    /execute[\s]*\(/i,
+    /declare[\s]/i,                 // Variable declaration
+
+    // Obfuscation attempts
+    /0x[0-9a-f]+/i,                 // Hex encoding
+    /[\s]+into[\s]+outfile/i,       // File operations
+    /[\s]+into[\s]+dumpfile/i,
+    /load_file/i,
+    /load[\s]+data[\s]+infile/i,
+
+    // System variables and functions
     /@@/,
-    /\$\$/,
-    '',
-] as string[];
+    /\$\$/,                         // PostgreSQL dollar quoting
+    /@[\w]+/,                       // Variables
+
+    // DDL statements - prevent schema modifications
+    /drop[\s]+table/i,
+    /drop[\s]+database/i,
+    /drop[\s]+schema/i,
+    /drop[\s]+index/i,
+    /drop[\s]+view/i,
+    /create[\s]+table/i,
+    /create[\s]+database/i,
+    /create[\s]+schema/i,
+    /create[\s]+index/i,
+    /create[\s]+view/i,
+    /alter[\s]+table/i,
+    /truncate[\s]+table/i,
+
+    // Time-based blind injection
+    /sleep[\s]*\(/i,
+    /benchmark[\s]*\(/i,
+    /waitfor[\s]+delay/i,
+];
 
 export const MAX_SQL_LENGTH = 100000; //2147483648 Default 2GB
-export const sanitizeSQL = function (SQL: string) {
+
+/**
+ * Sanitizes SQL strings to prevent injection attacks
+ * @param {string} SQL - The SQL query to sanitize
+ * @returns {string} - Sanitized SQL or empty string if dangerous patterns detected
+ */
+export const sanitizeSQL = function (SQL: string): string {
+    if (!SQL || typeof SQL !== 'string') {
+        return '';
+    }
+
     if (SQL.length > MAX_SQL_LENGTH) {
         return '';
     }
-    function removeMultipleSpace(str: string) {
-        return str.replace(/ +(?= )/g, '');
-    }
-    not_allow_text.forEach(function (value: string) {
-        var reg = new RegExp(value, 'gi');
-        let maxAttempt = 255;
 
-        let prevSQL = removeMultipleSpace(SQL).replace(reg, '').replace(/\s+/g, '');
-        for (let i = 0; i < maxAttempt; i++) {
-            SQL = removeMultipleSpace(SQL).replace(reg, '').replace(/\s+/g, ' ');
-            if (prevSQL === SQL) {
-                break;
-            }
-            prevSQL = SQL;
+    // Normalize the SQL for pattern matching
+    let normalizedSQL = SQL;
+
+    // Step 1: Decode common encoding tricks
+    try {
+        // Decode URI components (like %53%45%4C%45%43%54)
+        const decoded = decodeURIComponent(normalizedSQL);
+        if (decoded !== normalizedSQL) {
+            normalizedSQL = decoded;
         }
+    } catch (e) {
+        // Invalid URI encoding might itself be an attack
+    }
+
+    // Step 2: Remove zero-width characters and other Unicode tricks
+    normalizedSQL = normalizedSQL
+        .replace(/[\u200B-\u200D\uFEFF]/g, '')  // Zero-width spaces
+        .replace(/[\u00A0]/g, ' ');              // Non-breaking spaces to regular spaces
+
+    // Step 3: Extract and validate string literals
+    const stringLiterals: string[] = [];
+    const stringPattern = /'([^']|'')*'/g;
+    const sqlWithoutStrings = normalizedSQL.replace(stringPattern, function(match) {
+        // Check if string literal contains dangerous patterns
+        const innerContent = match.slice(1, -1).replace(/''/g, "'");
+
+        // Check for quote escape attempts in strings
+        if (innerContent.match(/[\\]['";]/)) {
+            stringLiterals.push('DANGEROUS');
+            return 'DANGEROUS_STRING';
+        }
+
+        stringLiterals.push(match);
+        return '__STRING_PLACEHOLDER__';
     });
-    if (SQL == ' ') SQL = '';
-    if (SQL.length > 0) if (SQL[SQL.length - 1] == ' ') SQL = SQL.slice(0, -1);
-    if (SQL.length > 0) if (SQL[0] == ' ') SQL = SQL.slice(1, SQL.length);
+
+    // If dangerous patterns found in strings, reject
+    if (stringLiterals.includes('DANGEROUS')) {
+        return '';
+    }
+
+    // Additional check: Look for unescaped quotes that might break out of string context
+    // Pattern: '...' OR '...' which indicates string breakout attempt
+    if (normalizedSQL.match(/'[^']*'\s*(OR|AND)\s*'/i)) {
+        return '';
+    }
+
+    // Step 4: Check for dangerous patterns in the non-string parts
+    let testSQL = sqlWithoutStrings;
+
+    // Normalize whitespace for pattern matching (but preserve structure)
+    testSQL = testSQL.replace(/\s+/g, ' ').trim();
+
+    // Check each dangerous pattern
+    for (let i = 0; i < not_allow_text.length; i++) {
+        const pattern = not_allow_text[i];
+        const reg = new RegExp(pattern, 'gi');
+
+        if (reg.test(testSQL)) {
+            // Dangerous pattern detected
+            return '';
+        }
+    }
+
+    // Step 5: Additional validation checks
+
+    // Check for unbalanced quotes (potential injection)
+    const singleQuotes = (normalizedSQL.match(/'/g) || []).length;
+    if (singleQuotes % 2 !== 0) {
+        return '';  // Unbalanced quotes
+    }
+
+    // Check for quote-based injection patterns like: id = 1' OR '1'='1
+    // This matches: digit/word followed by ' OR/AND ' pattern
+    if (normalizedSQL.match(/[\w\d]\s*'\s*(OR|AND)\s*'/i)) {
+        return '';  // Potential quote breakout injection
+    }
+
+    // Check for backslash escape attempts (not standard SQL)
+    if (normalizedSQL.match(/\\['"]/)) {
+        return '';  // Backslash escaping not allowed
+    }
+
+    // Check for multiple statement attempts
+    const statementCount = (SQL.match(/;\s*\w/g) || []).length;
+    if (statementCount > 0) {
+        return '';  // Multiple statements detected
+    }
+
+    // Check for comment injection attempts
+    if (SQL.match(/['"].*?--/)) {
+        return '';  // Comment inside or after string
+    }
+
+    // Step 6: Return original SQL if all checks pass
+    // Only trim excessive whitespace, don't remove functional spaces
+    SQL = SQL.trim().replace(/\s+/g, ' ');
+
     return SQL;
 };

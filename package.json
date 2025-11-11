@@ -1,6 +1,6 @@
 {
     "name": "pg-sanitize",
-    "version": "1.0.11",
+    "version": "1.1.0",
     "description": "PG SQL Injection prevention with sanitize techniq",
     "main": "index.js",
     "scripts": {
@@ -9,19 +9,16 @@
     },
     "types": "index.d.ts",
     "repository": {
-        "url": "https://github.com/tonmanna/sanitizeSQL"
+        "url": "git+https://github.com/tonmanna/sanitizeSQL.git"
     },
     "author": "Tonmanna",
     "license": "ISC",
     "devDependencies": {
-        "@babel/preset-typescript": "^7.10.4",
-        "@types/jest": "^26.0.10",
-        "eslint": "^7.7.0",
-        "jest": "^26.4.2",
-        "prettier": "^2.1.0",
-        "ts-jest": "^26.2.0",
-        "typescript": "^3.9.0",
-        "rimraf": "^3.0.2",
-        "concurrently": "^6.0.0"
+        "@types/jest": "^30.0.0",
+        "eslint": "^9.39.1",
+        "jest": "^30.2.0",
+        "prettier": "^3.6.2",
+        "ts-jest": "^29.4.5",
+        "typescript": "^5.9.3"
     }
 }
